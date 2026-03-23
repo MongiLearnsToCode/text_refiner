@@ -1,0 +1,5 @@
+{
+  "name": "Text Refiner & Prompt Builder",
+  "description": "Refine unstructured text for clarity, grammar, and professional tone, and build structured prompts for AI coding agents.",
+  "requestFramePermissions": []
+}
