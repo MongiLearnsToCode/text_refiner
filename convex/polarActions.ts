@@ -8,7 +8,8 @@ import { validateEvent, WebhookVerificationError } from "@polar-sh/sdk/webhooks"
 function polar() {
   const token = process.env.POLAR_ACCESS_TOKEN;
   if (!token) throw new Error("POLAR_ACCESS_TOKEN is not set in Convex environment variables.");
-  return new Polar({ accessToken: token });
+  const server = process.env.POLAR_SERVER as "sandbox" | "production" | undefined ?? "sandbox";
+  return new Polar({ accessToken: token, server });
 }
 
 // ─── Public actions ────────────────────────────────────────────────────────────
