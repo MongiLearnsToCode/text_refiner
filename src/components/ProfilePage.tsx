@@ -16,7 +16,9 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
   const planData = useQuery(api.subscriptions.getUserPlan) ?? { plan: "free" as const };
   const usageData = useQuery(api.usage.getUsage) ?? { count: 0, limit: 20 };
   const cancelSubscription = useAction(api.polarActions.cancelSubscription);
+  const resumeSubscription = useAction(api.polarActions.resumeSubscription);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const isPro = planData.plan === "pro";
@@ -33,6 +35,17 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
       alert("Could not cancel subscription. Please try again.");
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    setResumeLoading(true);
+    try {
+      await resumeSubscription({});
+    } catch {
+      alert("Could not resume subscription. Please try again.");
+    } finally {
+      setResumeLoading(false);
     }
   };
 
@@ -119,7 +132,18 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
               </ul>
               {isPro ? (
                 <>
-                  {showCancelConfirm ? (
+                  {cancelAtPeriodEnd ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={handleResumeSubscription}
+                      disabled={resumeLoading}
+                    >
+                      {resumeLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Resume subscription
+                    </Button>
+                  ) : showCancelConfirm ? (
                     <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                       <p className="text-xs text-foreground font-medium">
                         Your subscription will remain active until the end of the billing period, then will not renew.

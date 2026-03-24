@@ -56,6 +56,25 @@ export const cancelSubscription = action({
   },
 });
 
+/** Resumes a subscription that was set to cancel at period end. */
+export const resumeSubscription = action({
+  args: {},
+  handler: async (ctx): Promise<void> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const sub = await ctx.runQuery(internal.subscriptions.getByUserId, {
+      userId: identity.tokenIdentifier,
+    });
+    if (!sub?.polarSubscriptionId) throw new Error("No active subscription found.");
+
+    await polar().subscriptions.update({
+      id: sub.polarSubscriptionId,
+      subscriptionUpdate: { cancelAtPeriodEnd: false },
+    });
+  },
+});
+
 // ─── Internal webhook action ───────────────────────────────────────────────────
 
 export const handleWebhook = internalAction({
