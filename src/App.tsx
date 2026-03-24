@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useAction } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { refineText, RefineOptions } from './services/geminiService';
@@ -7,7 +7,7 @@ import { PromptVersion, ToneOption } from './types';
 import { fleschKincaid } from '@/utils/readability';
 import { scorePrompt } from '@/utils/promptScore';
 import Markdown from 'react-markdown';
-import { Copy, ArrowRightLeft, Loader2, Check, Pin, PinOff, Trash2, LogOut, History, GitCompare, Shuffle, ChevronDown, FileText, FileDown, BookmarkPlus, Lock, Zap } from 'lucide-react';
+import { Copy, ArrowRightLeft, Loader2, Check, Pin, PinOff, Trash2, History, GitCompare, Shuffle, ChevronDown, FileText, FileDown, BookmarkPlus, Lock, Zap, User } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { DiffView } from '@/components/DiffView';
 import { ReadabilityBadge } from '@/components/ReadabilityBadge';
@@ -18,6 +18,8 @@ import { authClient } from '@/lib/auth-client';
 import { SignInPage } from '@/components/auth/SignInPage';
 import { SignUpPage } from '@/components/auth/SignUpPage';
 import { HistoryPage } from '@/components/HistoryPage';
+import { SuccessPage } from '@/components/SuccessPage';
+import { ProfilePage } from '@/components/ProfilePage';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -26,7 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-type AuthSession = typeof authClient.$Infer.Session;
+export type AuthSession = typeof authClient.$Infer.Session;
 
 const CONTEXT_OPTIONS = [
   'Proposal writing',
@@ -106,11 +108,20 @@ function AppContent({ session }: { session: AuthSession }) {
   const saveTemplate = useMutation(api.promptTemplates.save);
   const removeTemplate = useMutation(api.promptTemplates.remove);
   const templates = useQuery(api.promptTemplates.list) ?? [];
-  const getPortalUrl = useAction(api.polarActions.getPortalUrl);
 
   const isPro = planData.plan === "pro";
-  const [view, setView] = useState<'editor' | 'history'>('editor');
+  const [view, setView] = useState<'editor' | 'history' | 'profile'>('editor');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('upgraded') === 'true';
+  });
+
+  useEffect(() => {
+    if (showSuccess) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [showSuccess]);
   const [inputText, setInputText] = useState('');
   const [outputText, setOutputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -311,22 +322,6 @@ function AppContent({ session }: { session: AuthSession }) {
               Upgrade
             </Button>
           )}
-          {isPro && (
-            <button
-              onClick={async () => {
-                try {
-                  const { url } = await getPortalUrl({});
-                  window.open(url, '_blank');
-                } catch {
-                  alert('Could not open subscription portal. Please try again.');
-                }
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title="Manage subscription"
-            >
-              Manage plan
-            </button>
-          )}
           <Button
             variant={view === 'history' ? 'secondary' : 'ghost'}
             size="icon"
@@ -335,6 +330,15 @@ function AppContent({ session }: { session: AuthSession }) {
             className="text-muted-foreground hover:text-foreground"
           >
             <History className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={view === 'profile' ? 'secondary' : 'ghost'}
+            size="icon"
+            onClick={() => setView(view === 'profile' ? 'editor' : 'profile')}
+            title="Account"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <User className="w-4 h-4" />
           </Button>
           {view === 'editor' && (
             <Button
@@ -346,15 +350,6 @@ function AppContent({ session }: { session: AuthSession }) {
               {isProcessing ? 'Refining...' : 'Refine Text'}
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => authClient.signOut()}
-            title="Sign out"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <LogOut className="w-4 h-4" />
-          </Button>
         </div>
       </header>
 
@@ -371,7 +366,15 @@ function AppContent({ session }: { session: AuthSession }) {
         />
       )}
 
-      <div className={`flex-1 flex overflow-hidden relative ${view === 'history' ? 'hidden' : ''}`}>
+      {view === 'profile' && (
+        <ProfilePage
+          session={session}
+          onBack={() => setView('editor')}
+          onUpgrade={() => { setView('editor'); setShowUpgradeModal(true); }}
+        />
+      )}
+
+      <div className={`flex-1 flex overflow-hidden relative ${view !== 'editor' ? 'hidden' : ''}`}>
         {/* Sidebar */}
         <div
           className={`relative flex-shrink-0 transition-all duration-300 z-20 ${
@@ -861,6 +864,7 @@ function AppContent({ session }: { session: AuthSession }) {
     </div>
 
     {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
+    {showSuccess && <SuccessPage onContinue={() => setShowSuccess(false)} />}
     </>
   );
 }
