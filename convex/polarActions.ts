@@ -101,16 +101,27 @@ export const handleWebhook = internalAction({
         });
         break;
 
-      case "subscription.updated":
+      case "subscription.updated": {
+        const stillPro = data.status === "active" || (data.status === "canceled" && data.cancelAtPeriodEnd);
         await ctx.runMutation(internal.subscriptions.upsertSubscription, {
           userId,
-          plan: data.status === "active" ? "pro" : "free",
+          plan: stillPro ? "pro" : "free",
+          polarSubscriptionId: data.id,
+          cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
+        });
+        break;
+      }
+
+      case "subscription.canceled":
+        // cancelAtPeriodEnd means still active until the billing period ends
+        await ctx.runMutation(internal.subscriptions.upsertSubscription, {
+          userId,
+          plan: data.cancelAtPeriodEnd ? "pro" : "free",
           polarSubscriptionId: data.id,
           cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
         });
         break;
 
-      case "subscription.canceled":
       case "subscription.revoked":
         await ctx.runMutation(internal.subscriptions.upsertSubscription, {
           userId,
