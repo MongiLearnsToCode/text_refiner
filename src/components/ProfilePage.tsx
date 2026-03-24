@@ -1,7 +1,7 @@
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState } from "react";
-import { ArrowLeft, Zap, Check, Loader2, LogOut, Sparkles, Shield, Activity } from "lucide-react";
+import { ArrowLeft, Zap, Check, Loader2, LogOut, Sparkles, Shield, Activity, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import type { AuthSession } from "../App";
@@ -15,23 +15,24 @@ interface ProfilePageProps {
 export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
   const planData = useQuery(api.subscriptions.getUserPlan) ?? { plan: "free" as const };
   const usageData = useQuery(api.usage.getUsage) ?? { count: 0, limit: 20 };
-  const getPortalUrl = useAction(api.polarActions.getPortalUrl);
-  const [portalLoading, setPortalLoading] = useState(false);
+  const cancelSubscription = useAction(api.polarActions.cancelSubscription);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const isPro = planData.plan === "pro";
   const cancelAtPeriodEnd = isPro && (planData as any).cancelAtPeriodEnd;
   const limit = usageData.limit ?? 20;
   const usagePercent = usageData.limit ? Math.min(Math.round((usageData.count / limit) * 100), 100) : 0;
 
-  const handleManagePlan = async () => {
-    setPortalLoading(true);
+  const handleCancelSubscription = async () => {
+    setCancelLoading(true);
     try {
-      const { url } = await getPortalUrl({});
-      window.open(url, "_blank");
+      await cancelSubscription({});
+      setShowCancelConfirm(false);
     } catch {
-      alert("Could not open subscription portal. Please try again.");
+      alert("Could not cancel subscription. Please try again.");
     } finally {
-      setPortalLoading(false);
+      setCancelLoading(false);
     }
   };
 
@@ -117,10 +118,46 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
                 ))}
               </ul>
               {isPro ? (
-                <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleManagePlan} disabled={portalLoading}>
-                  {portalLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Manage subscription
-                </Button>
+                <>
+                  {showCancelConfirm ? (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                      <p className="text-xs text-foreground font-medium">
+                        Your subscription will remain active until the end of the billing period, then will not renew.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="flex-1 gap-2"
+                          onClick={handleCancelSubscription}
+                          disabled={cancelLoading}
+                        >
+                          {cancelLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          Yes, cancel
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-2"
+                          onClick={() => setShowCancelConfirm(false)}
+                          disabled={cancelLoading}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          Keep plan
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 text-destructive hover:text-destructive hover:border-destructive/40"
+                      onClick={() => setShowCancelConfirm(true)}
+                    >
+                      Cancel subscription
+                    </Button>
+                  )}
+                </>
               ) : (
                 <Button className="w-full gap-2" onClick={onUpgrade}>
                   <Zap className="w-4 h-4" />

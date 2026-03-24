@@ -37,15 +37,22 @@ export const createCheckoutSession = action({
   },
 });
 
-/** Returns the Polar customer portal URL for managing the subscription. */
-export const getPortalUrl = action({
+/** Cancels the user's subscription at period end. */
+export const cancelSubscription = action({
   args: {},
-  handler: async (ctx): Promise<{ url: string }> => {
+  handler: async (ctx): Promise<void> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    // Polar customer portal is at polar.sh — customers authenticate directly.
-    return { url: "https://polar.sh/account/subscriptions" };
+    const sub = await ctx.runQuery(internal.subscriptions.getByUserId, {
+      userId: identity.tokenIdentifier,
+    });
+    if (!sub?.polarSubscriptionId) throw new Error("No active subscription found.");
+
+    await polar().subscriptions.update({
+      id: sub.polarSubscriptionId,
+      subscriptionUpdate: { cancelAtPeriodEnd: true },
+    });
   },
 });
 
