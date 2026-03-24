@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import type { ToneOption } from "../types";
 
 const ai = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true });
 const MODEL = "llama-3.3-70b-versatile";
@@ -17,7 +18,18 @@ export interface RefineOptions {
   aiPreset: string;
   structureGenerator: boolean;
   optimizationPass: boolean;
+  tone: ToneOption;
+  wordTarget?: string;
+  customStyleGuide?: string;
 }
+
+const TONE_INSTRUCTIONS: Record<ToneOption, string> = {
+  Professional: "Use a formal, authoritative, and polished tone appropriate for business audiences.",
+  Casual: "Use a relaxed, conversational, and approachable tone — as if talking to a colleague.",
+  Persuasive: "Use a confident, compelling tone that motivates the reader to agree or take action.",
+  Academic: "Use a precise, evidence-oriented tone with structured argumentation, avoiding colloquialisms.",
+  Empathetic: "Use a warm, understanding tone that acknowledges the reader's perspective and feelings.",
+};
 
 export async function refineText(text: string, options: RefineOptions): Promise<string> {
   const {
@@ -28,6 +40,9 @@ export async function refineText(text: string, options: RefineOptions): Promise<
     aiPreset,
     structureGenerator,
     optimizationPass,
+    tone,
+    wordTarget,
+    customStyleGuide,
   } = options;
 
   let prompt = "";
@@ -48,6 +63,61 @@ Please apply the following strict rules:
 - Ensure the tone is authentic, direct, and professional without being dramatic or exaggerated.
 
 Here is the raw text:\n<raw_text>\n${text}\n</raw_text>\n\nProvide ONLY the humanized text in your response, without any conversational filler.`;
+  } else if (processingMode === "Simplify") {
+    prompt = `You are an expert at plain-English communication. Your task is to simplify the following text so that anyone can understand it — even someone with no background in the subject.
+
+Apply these rules:
+- Replace jargon, acronyms, and technical terms with plain everyday words. If a technical term must appear, define it in parentheses on first use.
+- Break long sentences into shorter ones (aim for 15–20 words max per sentence).
+- Use active voice throughout.
+- Replace abstract nouns with concrete verbs where possible (e.g. "make a decision" → "decide").
+- If the text contains numbered steps or bullet points, keep that structure — clarity over prose.
+- Do NOT add information that wasn't in the original. Do NOT oversimplify to the point of losing accuracy.
+
+Here is the text to simplify:
+<raw_text>
+${text}
+</raw_text>
+
+Provide ONLY the simplified text in your response, without any commentary.`;
+  } else if (processingMode === "Formalize") {
+    prompt = `You are an expert legal and academic editor. Your task is to rewrite the following text in a formal, professional register suitable for legal documents, academic papers, or official correspondence.
+
+Apply these rules:
+- Use precise, unambiguous language. Avoid contractions (e.g. "don't" → "do not").
+- Prefer the passive voice where it confers objectivity (e.g. "The committee reviewed" → "The matter was reviewed by the committee"), but use active voice when the subject must be clear.
+- Replace colloquialisms and informal phrases with formal equivalents (e.g. "find out" → "ascertain", "look into" → "investigate", "use" → "utilise").
+- Ensure all claims are appropriately hedged where necessary (e.g. "appears to", "it is submitted that", "may be construed as").
+- Organise complex information into clearly delineated sections or clauses where appropriate.
+- Remove em dashes (—) and replace with formal punctuation (semicolons, colons, or parenthetical clauses).
+- Correct all grammar and spelling errors, using British English conventions.
+
+Here is the text to formalise:
+<raw_text>
+${text}
+</raw_text>
+
+Provide ONLY the formalised text in your response, without any commentary.`;
+  } else if (processingMode === "Email Polish") {
+    prompt = `You are an expert email copywriter and communications specialist. Polish the following email for professional, clear, and persuasive impact.
+
+Apply these improvements:
+1. Subject line: If present, make it specific, benefit-led, and under 50 characters. If absent, propose one prefixed with "Subject: ".
+2. Opening hook: Rewrite the opening sentence to immediately establish relevance. Eliminate generic openers like "I hope this email finds you well."
+3. Body: Ensure it is scannable — short paragraphs, active voice, no redundant sentences.
+4. Call to action: Ensure exactly one clear, specific CTA near the end (e.g. "Can we schedule a 20-minute call on Thursday?" not "Let me know what you think.").
+5. Sign-off: End with a professional but warm sign-off. Preserve the sender's name if present.
+6. Remove em dashes (—) and replace with contextually correct punctuation.
+7. Correct all grammar and spelling errors.
+
+Preserve the original intent and any specific details (names, dates, figures).
+
+Here is the email to polish:
+<raw_email>
+${text}
+</raw_email>
+
+Provide ONLY the polished email in your response, without any commentary or explanation.`;
   } else {
     prompt = `You are an expert editor and technical writer. Your task is to refine the following rough text.\n\n`;
 
@@ -55,6 +125,7 @@ Here is the raw text:\n<raw_text>\n${text}\n</raw_text>\n\nProvide ONLY the huma
       prompt += `The user wants to transform this text into a structured prompt for an AI coding agent.\n`;
     } else {
       prompt += `The target writing context is: ${context}. Adjust tone, structure, and vocabulary appropriately.\n`;
+      prompt += `Tone target: ${TONE_INSTRUCTIONS[tone]}\n`;
     }
 
     prompt += `\nPlease apply the following editing rules:\n`;
@@ -82,6 +153,20 @@ Here is the raw text:\n<raw_text>\n${text}\n</raw_text>\n\nProvide ONLY the huma
       if (aiPreset !== "None") {
         prompt += `\nFormat the output to match the style commonly used for a ${aiPreset} prompt, ensuring it is immediately usable.\n`;
       }
+    }
+
+    if (wordTarget && wordTarget !== "none") {
+      const targetMap: Record<string, string> = {
+        short: "approximately 100 words",
+        medium: "approximately 300 words",
+        long: "approximately 500 words",
+      };
+      const targetDesc = targetMap[wordTarget] ?? `approximately ${wordTarget} words`;
+      prompt += `- Target output length: ${targetDesc}. Trim or expand content proportionally to meet this target.\n`;
+    }
+
+    if (customStyleGuide?.trim()) {
+      prompt += `\nAdditional brand/style guidelines to follow strictly:\n<style_guide>\n${customStyleGuide.trim()}\n</style_guide>\n`;
     }
 
     prompt += `\nHere is the raw text to refine:\n<raw_text>\n${text}\n</raw_text>\n\nProvide ONLY the refined text in your response, without any conversational filler.`;

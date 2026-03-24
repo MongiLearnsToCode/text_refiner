@@ -4,3 +4,5 @@ export interface PromptVersion {
   text: string;
   timestamp: number;
 }
+
+export type ToneOption = 'Professional' | 'Casual' | 'Persuasive' | 'Academic' | 'Empathetic';

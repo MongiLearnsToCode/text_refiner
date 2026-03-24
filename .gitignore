@@ -6,3 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# AI agent/tool directories
+.agent/
+.agents/
+.claude/
+.kiro/
+.qwen/
+.zencoder/
+skills-lock.json
