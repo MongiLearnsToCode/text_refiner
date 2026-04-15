@@ -7,7 +7,7 @@ import { PromptVersion, ToneOption } from './types';
 import { fleschKincaid } from '@/utils/readability';
 import { scorePrompt } from '@/utils/promptScore';
 import Markdown from 'react-markdown';
-import { Copy, ArrowRightLeft, Loader2, Check, Pin, PinOff, Trash2, History, GitCompare, Shuffle, ChevronDown, FileText, FileDown, BookmarkPlus, Lock, Zap, User } from 'lucide-react';
+import { Copy, ArrowRightLeft, Loader2, Check, Pin, PinOff, Trash2, History, GitCompare, Shuffle, ChevronDown, FileText, FileDown, BookmarkPlus, Lock, Zap, User, ClipboardPaste } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { DiffView } from '@/components/DiffView';
 import { ReadabilityBadge } from '@/components/ReadabilityBadge';
@@ -686,16 +686,30 @@ function AppContent({ session }: { session: AuthSession }) {
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-medium text-foreground">Raw Input</h3>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setInputText('')}
-                disabled={!inputText}
-                className="h-7 text-xs text-muted-foreground hover:text-destructive px-2"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1" />
-                Clear
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    const text = await navigator.clipboard.readText();
+                    if (text) setInputText(text);
+                  }}
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
+                >
+                  <ClipboardPaste className="w-3.5 h-3.5 mr-1" />
+                  Paste
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setInputText('')}
+                  disabled={!inputText}
+                  className="h-7 text-xs text-muted-foreground hover:text-destructive px-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  Clear
+                </Button>
+              </div>
             </div>
             <Textarea
               value={inputText}
