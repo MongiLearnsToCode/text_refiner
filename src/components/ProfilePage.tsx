@@ -54,8 +54,8 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
     : (session.user.email?.[0]?.toUpperCase() ?? "?");
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-8">
+      <div className="max-w-2xl mx-auto space-y-5 md:space-y-6">
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -67,8 +67,8 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
         <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Account</h1>
 
         {/* Profile */}
-        <section className="bg-card rounded-xl border border-border shadow-sm p-6">
-          <div className="flex items-center justify-between">
+        <section className="bg-card rounded-xl border border-border shadow-sm p-5 md:p-6">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-base flex-shrink-0">
                 {initials}
@@ -91,9 +91,9 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
         </section>
 
         {/* Bento grid: Subscription + Usage */}
-        <div className="grid grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-5">
           {/* Subscription card */}
-          <div className="col-span-3 bg-card rounded-xl border border-border shadow-sm p-6 flex flex-col justify-between">
+          <div className="md:col-span-3 bg-card rounded-xl border border-border shadow-sm p-5 md:p-6 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex justify-between items-start">
                 <div className="p-2.5 bg-muted rounded-xl">
@@ -192,7 +192,7 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
           </div>
 
           {/* Usage card */}
-          <div className="col-span-2 bg-muted/40 rounded-xl border border-border p-5">
+          <div className="md:col-span-2 bg-muted/40 rounded-xl border border-border p-5">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-foreground text-sm">Usage</h3>
               <Activity className="w-4 h-4 text-muted-foreground" />

@@ -112,13 +112,13 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-card border-b border-border">
         {/* Title row */}
-        <div className="px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={onBack} className="gap-2 font-medium">
+        <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <Button variant="ghost" onClick={onBack} className="gap-2 font-medium px-2 md:px-3">
               <ArrowLeft className="w-4 h-4" />
-              Back to Editor
+              <span className="hidden sm:inline">Back to Editor</span>
             </Button>
-            <Separator orientation="vertical" className="h-5" />
+            <Separator orientation="vertical" className="h-5 hidden sm:block" />
             <h2 className="text-sm font-semibold text-foreground">Refinement History</h2>
             {planFilteredResults.length > 0 && (
               <span className="text-xs text-muted-foreground">
@@ -140,42 +140,44 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
         </div>
 
         {/* Filter row */}
-        <div className="px-6 py-2.5 flex items-center gap-3 border-t border-border/50 bg-muted/20">
-          <div className="relative flex-1 max-w-xs">
+        <div className="px-4 md:px-6 py-2.5 flex flex-wrap items-center gap-2 md:gap-3 border-t border-border/50 bg-muted/20">
+          <div className="relative w-full sm:flex-1 sm:max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search labels, input, output…"
-              className="pl-8 h-8 text-sm bg-background/60 border-border/50"
+              className="pl-8 h-9 md:h-8 text-sm bg-background/60 border-border/50 w-full"
             />
           </div>
-          <Select value={modeFilter} onValueChange={setModeFilter}>
-            <SelectTrigger className="w-44 h-8 text-sm bg-background/60 border-border/50">
-              <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 text-muted-foreground/60 shrink-0" />
-              <SelectValue placeholder="All modes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All modes</SelectItem>
-              {availableModes.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-36 h-8 text-sm bg-background/60 border-border/50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DATE_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {hasActiveFilters && (
-            <button
-              onClick={() => { setSearchQuery(""); setModeFilter("all"); setDateFilter("all"); }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
-            >
-              Clear filters
-            </button>
-          )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Select value={modeFilter} onValueChange={setModeFilter}>
+              <SelectTrigger className="flex-1 sm:w-40 h-9 md:h-8 text-sm bg-background/60 border-border/50">
+                <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 text-muted-foreground/60 shrink-0" />
+                <SelectValue placeholder="All modes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All modes</SelectItem>
+                {availableModes.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="flex-1 sm:w-32 h-9 md:h-8 text-sm bg-background/60 border-border/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DATE_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {hasActiveFilters && (
+              <button
+                onClick={() => { setSearchQuery(""); setModeFilter("all"); setDateFilter("all"); }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap shrink-0"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -196,7 +198,7 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
       )}
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center py-32 text-center">
             <Clock className="w-10 h-10 text-muted-foreground/40 mb-4" />
@@ -382,7 +384,7 @@ function ListView({
           </div>
 
           {expandedId === item._id && (
-            <div className="border-t border-border grid grid-cols-2 divide-x divide-border">
+            <div className="border-t border-border grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-border">
               <div className="p-4">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Input</p>
                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{item.inputText}</p>
@@ -403,7 +405,7 @@ function ListView({
 
 function GridView({ results, ...shared }: SharedProps) {
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
       {results.map((item) => (
         <div key={item._id} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm flex flex-col">
           {/* Card header */}
