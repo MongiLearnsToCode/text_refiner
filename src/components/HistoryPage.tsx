@@ -41,7 +41,7 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
   const remove = useMutation(api.refinements.remove);
   const updateLabel = useMutation(api.refinements.updateLabel);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
