@@ -685,7 +685,6 @@ function AppContent({ session }: { session: AuthSession }) {
             <div className="bg-muted/50 border-b border-border px-4 py-2 flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-medium text-foreground">Raw Input</h3>
-                {inputScore && <ReadabilityBadge score={inputScore} />}
               </div>
               <Button
                 variant="ghost"
@@ -711,7 +710,6 @@ function AppContent({ session }: { session: AuthSession }) {
             <div className="bg-muted/50 border-b border-border px-4 py-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <h3 className="text-sm font-medium text-foreground shrink-0">Refined Output</h3>
-                {outputScore && !developerMode && <ReadabilityBadge score={outputScore} />}
                 {!isPro && outputText && !developerMode && (
                   <button
                     onClick={() => setShowUpgradeModal(true)}
