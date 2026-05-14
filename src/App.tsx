@@ -675,7 +675,7 @@ function AppContent({ session }: { session: AuthSession }) {
   );
 
   const outputPanelBody = (
-    <div className="flex-1 p-4 md:p-6 overflow-y-auto prose prose-sm max-w-none">
+    <div className="flex-1 p-4 md:p-6 overflow-y-auto prose prose-sm max-w-none font-editor">
       {outputText ? (
         showDiff && inputText ? (
           <DiffView
@@ -687,7 +687,7 @@ function AppContent({ session }: { session: AuthSession }) {
           <Markdown>{outputText}</Markdown>
         )
       ) : (
-        <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">
+        <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm font-sans">
           Refined text will appear here...
         </div>
       )}
@@ -889,7 +889,7 @@ function AppContent({ session }: { session: AuthSession }) {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Paste your rough text or messy ideas here..."
-                className="flex-1 w-full p-4 resize-none border-0 rounded-none focus-visible:ring-0 text-foreground shadow-none bg-transparent text-base"
+                className="flex-1 w-full p-4 resize-none border-0 rounded-none focus-visible:ring-0 text-foreground shadow-none bg-transparent text-base font-editor leading-[30px]"
               />
             </div>
 
@@ -951,7 +951,7 @@ function AppContent({ session }: { session: AuthSession }) {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Paste your rough text or messy ideas here..."
-                className="flex-1 w-full p-4 resize-none border-0 rounded-none focus-visible:ring-0 text-foreground shadow-none bg-transparent"
+                className="flex-1 w-full p-4 resize-none border-0 rounded-none focus-visible:ring-0 text-foreground shadow-none bg-transparent font-editor leading-[30px]"
               />
             </div>
 
@@ -986,7 +986,7 @@ function AppContent({ session }: { session: AuthSession }) {
                     Close
                   </Button>
                 </div>
-                <div className="flex-1 p-6 overflow-y-auto prose prose-sm max-w-none opacity-80">
+                <div className="flex-1 p-6 overflow-y-auto prose prose-sm max-w-none opacity-80 font-editor">
                   <Markdown>{compareVersionText}</Markdown>
                 </div>
               </div>
