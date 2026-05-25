@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
+import type * as llm from "../llm.js";
 import type * as polarActions from "../polarActions.js";
 import type * as promptTemplates from "../promptTemplates.js";
 import type * as refinements from "../refinements.js";
@@ -25,6 +26,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
+  llm: typeof llm;
   polarActions: typeof polarActions;
   promptTemplates: typeof promptTemplates;
   refinements: typeof refinements;

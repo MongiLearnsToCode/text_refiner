@@ -1,16 +1,12 @@
-import Groq from "groq-sdk";
-import type { RefineOptions } from "./geminiService";
+import type { RefineOptions } from "./groqService";
 
-const ai = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true });
-const MODEL = "llama-3.3-70b-versatile";
-
-export async function generateVariants(
+export function buildVariantsPrompt(
   originalInput: string,
   currentOutput: string,
   options: RefineOptions,
   count = 2
-): Promise<string[]> {
-  const prompt = `You are an expert editor. Below is an original text and one refined version of it.
+): string {
+  return `You are an expert editor. Below is an original text and one refined version of it.
 
 Original text:
 <original>
@@ -28,15 +24,10 @@ Context: ${options.context}
 Tone: ${options.tone ?? "Professional"}
 
 Format your response as exactly ${count} versions separated by the delimiter "---VARIANT---". Output only the variant text — no labels, numbering, or commentary.`;
+}
 
-  const response = await ai.chat.completions.create({
-    model: MODEL,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const raw = response.choices[0]?.message?.content ?? "";
+export function parseVariantsResponse(raw: string, count: number, fallback: string): string[] {
   const parts = raw.split("---VARIANT---").map((s) => s.trim()).filter(Boolean);
-
   if (parts.length >= count) return parts.slice(0, count);
-  return [...parts, ...Array(count - parts.length).fill(currentOutput)];
+  return [...parts, ...Array(count - parts.length).fill(fallback)];
 }

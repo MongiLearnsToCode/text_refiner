@@ -7,9 +7,10 @@ import { Loader2 } from "lucide-react";
 
 interface SignInPageProps {
   onSwitchToSignUp: () => void;
+  onForgotPassword: () => void;
 }
 
-export function SignInPage({ onSwitchToSignUp }: SignInPageProps) {
+export function SignInPage({ onSwitchToSignUp, onForgotPassword }: SignInPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +30,7 @@ export function SignInPage({ onSwitchToSignUp }: SignInPageProps) {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
-          <p className="text-sm text-muted-foreground">Sign in to Text Refiner</p>
+          <p className="text-sm text-muted-foreground">Sign in to Finer Text</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-sm">
@@ -47,7 +48,16 @@ export function SignInPage({ onSwitchToSignUp }: SignInPageProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="text-xs text-primary hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
             <Input
               id="password"
               type="password"

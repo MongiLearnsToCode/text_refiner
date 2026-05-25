@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useAction } from 'convex/react';
 import { api } from '../convex/_generated/api';
-import { refineText, RefineOptions } from './services/geminiService';
-import { generateVariants } from './services/variantsService';
+import { buildRefinePrompts, buildVariantsPrompt, RefineOptions } from './services/groqService';
+import { parseVariantsResponse } from './services/variantsService';
 import { PromptVersion, ToneOption } from './types';
 import { fleschKincaid } from '@/utils/readability';
 import { scorePrompt } from '@/utils/promptScore';
 import Markdown from 'react-markdown';
+import { Toaster, toast } from 'sonner';
 import { Copy, ArrowRightLeft, Loader2, Check, Pin, PinOff, Trash2, History, GitCompare, Shuffle, ChevronDown, FileText, FileDown, BookmarkPlus, Lock, Zap, User, ClipboardPaste, SlidersHorizontal, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { DiffView } from '@/components/DiffView';
@@ -17,6 +18,8 @@ import { UpgradeModal } from '@/components/UpgradeModal';
 import { authClient } from '@/lib/auth-client';
 import { SignInPage } from '@/components/auth/SignInPage';
 import { SignUpPage } from '@/components/auth/SignUpPage';
+import { ForgotPasswordPage } from '@/components/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/components/auth/ResetPasswordPage';
 import { HistoryPage } from '@/components/HistoryPage';
 import { SuccessPage } from '@/components/SuccessPage';
 import { ProfilePage } from '@/components/ProfilePage';
@@ -78,7 +81,7 @@ const EDITING_CHIP_LABELS: Record<string, string> = {
 
 export default function App() {
   const { data: session, isPending } = authClient.useSession();
-  const [authView, setAuthView] = useState<'signin' | 'signup'>('signin');
+  const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot-password' | 'reset-password'>('signin');
 
   if (isPending) {
     return (
@@ -89,10 +92,19 @@ export default function App() {
   }
 
   if (!session) {
-    if (authView === 'signup') {
-      return <SignUpPage onSwitchToSignIn={() => setAuthView('signin')} />;
+    switch (authView) {
+      case 'signup':
+        return <SignUpPage onSwitchToSignIn={() => setAuthView('signin')} />;
+      case 'forgot-password':
+        return <ForgotPasswordPage onBackToSignIn={() => setAuthView('signin')} />;
+      case 'reset-password':
+        return <ResetPasswordPage onComplete={() => setAuthView('signin')} />;
+      default:
+        return <SignInPage
+          onSwitchToSignUp={() => setAuthView('signup')}
+          onForgotPassword={() => setAuthView('forgot-password')}
+        />;
     }
-    return <SignInPage onSwitchToSignUp={() => setAuthView('signup')} />;
   }
 
   return <AppContent session={session} />;
@@ -108,6 +120,8 @@ function AppContent({ session }: { session: AuthSession }) {
   const saveTemplate = useMutation(api.promptTemplates.save);
   const removeTemplate = useMutation(api.promptTemplates.remove);
   const templates = useQuery(api.promptTemplates.list) ?? [];
+  const refineAction = useAction(api.llm.refine);
+  const generateVariantsAction = useAction(api.llm.generateVariants);
 
   const isPro = planData.plan === "pro";
   const [view, setView] = useState<'editor' | 'history' | 'profile'>('editor');
@@ -197,7 +211,8 @@ function AppContent({ session }: { session: AuthSession }) {
         wordTarget: effectiveWordTarget || 'none',
         customStyleGuide,
       };
-      const result = await refineText(inputText, options);
+      const { prompt, optimizationPrompt } = buildRefinePrompts(inputText, options);
+      const result = await refineAction({ prompt, optimizationPrompt });
       setOutputText(result);
       setMobileTab('output');
       await saveRefinement({
@@ -211,7 +226,7 @@ function AppContent({ session }: { session: AuthSession }) {
       if (msg.includes('USAGE_LIMIT_EXCEEDED')) {
         setShowUpgradeModal(true);
       } else {
-        alert(msg || 'Failed to refine text. Please check your connection and try again.');
+        toast.error(msg || 'Failed to refine text. Please check your connection and try again.');
       }
     } finally {
       setIsProcessing(false);
@@ -221,6 +236,7 @@ function AppContent({ session }: { session: AuthSession }) {
   const handleCopy = () => {
     navigator.clipboard.writeText(outputText);
     setCopied(true);
+    toast.success("Copied to clipboard.");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -254,11 +270,12 @@ function AppContent({ session }: { session: AuthSession }) {
         editingControls, aiPreset, structureGenerator, optimizationPass,
         wordTarget: 'none', customStyleGuide: undefined,
       };
-      const result = await generateVariants(inputText, outputText, options, 2);
-      setVariants(result);
+      const prompt = buildVariantsPrompt(inputText, outputText, options, 2);
+      const result = await generateVariantsAction({ prompt });
+      setVariants(result.length >= 2 ? result.slice(0, 2) : [...result, ...Array(2 - result.length).fill(outputText)]);
       setShowVariants(true);
     } catch (error: any) {
-      alert(error.message || 'Failed to generate variants. Please try again.');
+      toast.error(error.message || 'Failed to generate variants. Please try again.');
     } finally {
       setIsGeneratingVariants(false);
     }
@@ -303,6 +320,16 @@ function AppContent({ session }: { session: AuthSession }) {
   const isComprehensive = processingMode === 'Comprehensive Refinement';
   const refineDisabled = isProcessing || !inputText.trim() || (!isPro && (usageData.limit !== null) && usageData.count >= usageData.limit);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !refineDisabled) {
+        handleRefine();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleRefine, refineDisabled]);
+
   // ─── Sidebar body (shared between desktop sidebar and mobile sheet) ───────────
   const sidebarBody = (
     <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
@@ -315,6 +342,7 @@ function AppContent({ session }: { session: AuthSession }) {
             size="icon"
             onClick={() => { setIsSidebarLocked(!isSidebarLocked); setIsSidebarHovered(false); }}
             title={isSidebarLocked ? 'Unlock sidebar' : 'Lock sidebar'}
+            aria-label={isSidebarLocked ? 'Unlock sidebar' : 'Lock sidebar'}
             className="h-6 w-6 text-muted-foreground/40 hover:text-muted-foreground -mr-1 hidden md:flex"
           >
             {isSidebarLocked ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
@@ -696,11 +724,12 @@ function AppContent({ session }: { session: AuthSession }) {
 
   return (
     <>
+      <Toaster position="top-right" richColors />
       <div className="h-dvh bg-background flex flex-col text-foreground overflow-hidden">
         {/* Header */}
         <header className="bg-card border-b border-border px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10 shrink-0">
           <div>
-            <h1 className="text-lg md:text-xl font-semibold text-foreground leading-tight">Text Refiner</h1>
+            <h1 className="text-lg md:text-xl font-semibold text-foreground leading-tight">Finer Text</h1>
             <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">Turn messy text into clean, professional writing.</p>
           </div>
           <div className="flex items-center gap-1.5 md:gap-3">
@@ -727,6 +756,7 @@ function AppContent({ session }: { session: AuthSession }) {
               size="icon"
               onClick={() => setView(view === 'history' ? 'editor' : 'history')}
               title="Refinement history"
+              aria-label="Refinement history"
               className="hidden md:flex text-muted-foreground hover:text-foreground"
             >
               <History className="w-4 h-4" />
@@ -736,6 +766,7 @@ function AppContent({ session }: { session: AuthSession }) {
               size="icon"
               onClick={() => setView(view === 'profile' ? 'editor' : 'profile')}
               title="Account"
+              aria-label="Account settings"
               className="hidden md:flex text-muted-foreground hover:text-foreground"
             >
               <User className="w-4 h-4" />
@@ -748,6 +779,7 @@ function AppContent({ session }: { session: AuthSession }) {
                   size="icon"
                   onClick={() => setShowMobileSettings(true)}
                   title="Settings"
+                  aria-label="Open settings"
                   className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground"
                 >
                   <SlidersHorizontal className="w-4 h-4" />

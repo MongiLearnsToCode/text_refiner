@@ -8,6 +8,19 @@ const http = httpRouter();
 
 authComponent.registerRoutes(http, createAuth, { cors: true });
 
+// ─── Health check ────────────────────────────────────────────────────────────────
+
+http.route({
+  path: "/health",
+  method: "GET",
+  handler: httpAction(async () => {
+    return new Response(JSON.stringify({ status: "ok", timestamp: Date.now() }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
 // ─── Polar webhook ─────────────────────────────────────────────────────────────
 
 http.route({

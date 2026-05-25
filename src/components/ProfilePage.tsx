@@ -1,6 +1,7 @@
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState } from "react";
+import { toast } from "sonner";
 import { ArrowLeft, Zap, Check, Loader2, LogOut, Sparkles, Shield, Activity, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
@@ -31,8 +32,9 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
     try {
       await cancelSubscription({});
       setShowCancelConfirm(false);
+      toast.success("Subscription cancelled.");
     } catch {
-      alert("Could not cancel subscription. Please try again.");
+      toast.error("Could not cancel subscription. Please try again.");
     } finally {
       setCancelLoading(false);
     }
@@ -42,8 +44,9 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
     setResumeLoading(true);
     try {
       await resumeSubscription({});
+      toast.success("Subscription resumed.");
     } catch {
-      alert("Could not resume subscription. Please try again.");
+      toast.error("Could not resume subscription. Please try again.");
     } finally {
       setResumeLoading(false);
     }

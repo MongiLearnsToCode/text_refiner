@@ -1,8 +1,4 @@
-import Groq from "groq-sdk";
 import type { ToneOption } from "../types";
-
-const ai = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true });
-const MODEL = "llama-3.3-70b-versatile";
 
 export interface RefineOptions {
   processingMode: string;
@@ -31,7 +27,12 @@ const TONE_INSTRUCTIONS: Record<ToneOption, string> = {
   Empathetic: "Use a warm, understanding tone that acknowledges the reader's perspective and feelings.",
 };
 
-export async function refineText(text: string, options: RefineOptions): Promise<string> {
+interface RefinePrompts {
+  prompt: string;
+  optimizationPrompt?: string;
+}
+
+export function buildRefinePrompts(text: string, options: RefineOptions): RefinePrompts {
   const {
     processingMode,
     context,
@@ -172,17 +173,10 @@ Provide ONLY the polished email in your response, without any commentary or expl
     prompt += `\nHere is the raw text to refine:\n<raw_text>\n${text}\n</raw_text>\n\nProvide ONLY the refined text in your response, without any conversational filler.`;
   }
 
-  try {
-    const response = await ai.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-    });
+  let optimizationPrompt: string | undefined;
 
-    let refinedText = response.choices[0]?.message?.content || "";
-
-    // Optional second pass
-    if (developerMode && optimizationPass) {
-      const optPrompt = `You are an expert AI prompt engineer. Review the following prompt intended for an AI coding agent and optimize it.
+  if (developerMode && optimizationPass) {
+    optimizationPrompt = `You are an expert AI prompt engineer. Review the following prompt intended for an AI coding agent and optimize it.
 Your goals:
 - Remove any remaining ambiguity or vague language.
 - Tighten instructions to be highly actionable.
@@ -192,25 +186,37 @@ Your goals:
 
 Here is the prompt to optimize:
 <prompt>
-${refinedText}
+${prompt}
 </prompt>
 
 Provide ONLY the optimized prompt in your response, without any conversational filler.`;
-
-      const optResponse = await ai.chat.completions.create({
-        model: MODEL,
-        messages: [{ role: "user", content: optPrompt }],
-      });
-
-      refinedText = optResponse.choices[0]?.message?.content || refinedText;
-    }
-
-    return refinedText;
-  } catch (error: any) {
-    console.error("Error refining text:", error);
-    if (error?.status === 429 || error?.message?.includes("429") || error?.message?.includes("rate_limit") || error?.message?.includes("quota")) {
-      throw new Error("You have exceeded your Groq API rate limit. Please wait a moment and try again.");
-    }
-    throw new Error("Failed to refine text. Please try again.");
   }
+
+  return { prompt, optimizationPrompt };
+}
+
+export function buildVariantsPrompt(
+  originalInput: string,
+  currentOutput: string,
+  options: RefineOptions,
+  count = 2
+): string {
+  return `You are an expert editor. Below is an original text and one refined version of it.
+
+Original text:
+<original>
+${originalInput}
+</original>
+
+Current refined version:
+<current>
+${currentOutput}
+</current>
+
+Your task: produce ${count} ALTERNATIVE refined versions of the original text. Each alternative should achieve the same goals as the current version but differ meaningfully in sentence structure, phrasing, level of detail, or paragraph organisation.
+
+Context: ${options.context}
+Tone: ${options.tone ?? "Professional"}
+
+Format your response as exactly ${count} versions separated by the delimiter "---VARIANT---". Output only the variant text — no labels, numbering, or commentary.`;
 }

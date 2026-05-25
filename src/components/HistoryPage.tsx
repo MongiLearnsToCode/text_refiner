@@ -3,6 +3,7 @@ import { usePaginatedQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import Markdown from "react-markdown";
+import { toast } from "sonner";
 import {
   Trash2, ArrowUpLeft, ChevronDown, Pencil, Check, X,
   Clock, ArrowLeft, LayoutList, LayoutGrid, Search, SlidersHorizontal, Zap,
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type ViewMode = "list" | "grid";
 
@@ -45,6 +47,7 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<Id<"refinements"> | null>(null);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,6 +97,13 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
   };
 
   const cancelEdit = () => setEditingId(null);
+
+  const handleDelete = async () => {
+    if (!deleteConfirmId) return;
+    await remove({ id: deleteConfirmId });
+    setDeleteConfirmId(null);
+    toast.success("Refinement deleted.");
+  };
 
   const formatDate = (ts: number) =>
     new Date(ts).toLocaleDateString(undefined, {
@@ -236,7 +246,7 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
             cancelEdit={cancelEdit}
             formatDate={formatDate}
             onLoadRefinement={onLoadRefinement}
-            remove={remove}
+            onDeleteRequest={(id) => setDeleteConfirmId(id)}
           />
         ) : (
           <GridView
@@ -249,7 +259,7 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
             cancelEdit={cancelEdit}
             formatDate={formatDate}
             onLoadRefinement={onLoadRefinement}
-            remove={remove}
+            onDeleteRequest={(id) => setDeleteConfirmId(id)}
           />
         )}
 
@@ -266,6 +276,14 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        title="Delete refinement"
+        message="This action cannot be undone. The refinement will be permanently removed."
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   );
 }
@@ -291,7 +309,7 @@ interface SharedProps {
   cancelEdit: () => void;
   formatDate: (ts: number) => string;
   onLoadRefinement: (input: string, output: string) => void;
-  remove: (args: { id: Id<"refinements"> }) => void;
+  onDeleteRequest: (id: Id<"refinements">) => void;
 }
 
 // ─── Inline label editor ──────────────────────────────────────────────────────
@@ -369,7 +387,7 @@ function ListView({
               </Button>
               <Button
                 variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                title="Delete" onClick={() => shared.remove({ id: item._id })}
+                title="Delete" onClick={() => shared.onDeleteRequest(item._id)}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
@@ -434,7 +452,7 @@ function GridView({ results, ...shared }: SharedProps) {
             </Button>
             <Button
               variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              title="Delete" onClick={() => shared.remove({ id: item._id })}
+              title="Delete" onClick={() => shared.onDeleteRequest(item._id)}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
