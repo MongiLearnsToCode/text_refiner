@@ -195,6 +195,53 @@ Provide ONLY the optimized prompt in your response, without any conversational f
   return { prompt, optimizationPrompt };
 }
 
+export function buildSentenceRefinePrompt(
+  contextText: string,
+  sentence: string,
+  options: RefineOptions
+): string {
+  let prompt = `You are an expert editor. Refine the following sentence to match the required style, tone, and editing rules.
+
+Your task is to produce ONLY the refined version of the single sentence provided below. Do not modify or repeat the surrounding context.
+
+`;
+
+  if (!options.developerMode) {
+    prompt += `Target context: ${options.context}\n`;
+    prompt += `Tone: ${TONE_INSTRUCTIONS[options.tone]}\n`;
+  }
+
+  prompt += `\nEditing rules:\n`;
+  if (options.editingControls.removeEmDashes) {
+    prompt += `- Replace em dashes (—) with correct punctuation (commas, periods, semicolons, or parentheses).\n`;
+  }
+  if (options.editingControls.grammarCorrection) {
+    prompt += `- Correct grammar, spelling, and language errors.\n`;
+  }
+  if (options.editingControls.clarityConciseness) {
+    prompt += `- Improve clarity and conciseness. Remove fluff.\n`;
+  }
+  if (options.editingControls.structuralRefinement) {
+    prompt += `- Improve sentence flow and structure.\n`;
+  }
+  if (options.editingControls.toneAlignment && !options.developerMode) {
+    prompt += `- Align the tone to "${options.tone}".\n`;
+  }
+
+  if (options.customStyleGuide?.trim()) {
+    prompt += `\nStyle guide:\n${options.customStyleGuide.trim()}\n`;
+  }
+
+  if (contextText.trim()) {
+    prompt += `\nSurrounding context (read-only — do NOT modify):\n<context>\n${contextText.trim()}\n</context>\n\n`;
+  }
+
+  prompt += `Refine only this sentence:\n<sentence>\n${sentence}\n</sentence>\n\n`;
+  prompt += `Provide ONLY the refined sentence in your response. No commentary, no labels, no extra text.`;
+
+  return prompt;
+}
+
 export function buildVariantsPrompt(
   originalInput: string,
   currentOutput: string,

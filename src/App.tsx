@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useMutation, useQuery, useAction } from 'convex/react';
 import { api } from '../convex/_generated/api';
-import { buildRefinePrompts, buildVariantsPrompt, RefineOptions } from './services/groqService';
+import { buildRefinePrompts, buildSentenceRefinePrompt, buildVariantsPrompt, RefineOptions } from './services/groqService';
 import { parseVariantsResponse } from './services/variantsService';
 import { PromptVersion, ToneOption } from './types';
 import { fleschKincaid } from '@/utils/readability';
@@ -76,6 +76,19 @@ const EDITING_CHIP_LABELS: Record<string, string> = {
   structuralRefinement: 'Structure',
   toneAlignment: 'Tone',
 };
+
+function extractLastSentence(text: string): { beforeLastSentence: string; lastSentence: string } {
+  const trimmed = text.trimEnd();
+  if (!trimmed) return { beforeLastSentence: '', lastSentence: '' };
+  const matches = [...trimmed.matchAll(/[.!?](?:\s|$)/g)];
+  if (matches.length === 0) return { beforeLastSentence: '', lastSentence: trimmed };
+  const lastMatch = matches[matches.length - 1];
+  const splitPos = lastMatch.index! + lastMatch[0].length;
+  return {
+    beforeLastSentence: trimmed.slice(0, splitPos).trimEnd(),
+    lastSentence: trimmed.slice(splitPos).trim(),
+  };
+}
 
 // ─── Auth Gate ───────────────────────────────────────────────────────────────
 
@@ -172,6 +185,42 @@ function AppContent({ session }: { session: AuthSession }) {
   const [structureGenerator, setStructureGenerator] = useState(false);
   const [optimizationPass, setOptimizationPass] = useState(false);
 
+  // ─── Live Refinement ──────────────────────────────────────────────────────
+  const [liveRefinementEnabled, setLiveRefinementEnabled] = useState(false);
+  const [liveRefinementMode, setLiveRefinementMode] = useState<'full' | 'sentence'>('full');
+  const liveRefineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastLiveRefinedInputRef = useRef('');
+
+  // Refs to avoid stale closures in debounce callback
+  const inputTextRef = useRef(inputText);
+  inputTextRef.current = inputText;
+  const liveRefinementModeRef = useRef(liveRefinementMode);
+  liveRefinementModeRef.current = liveRefinementMode;
+  const isProcessingRef = useRef(isProcessing);
+  isProcessingRef.current = isProcessing;
+  const isProRef = useRef(isPro);
+  isProRef.current = isPro;
+  const processingModeRef = useRef(processingMode);
+  processingModeRef.current = processingMode;
+  const contextRef = useRef(context);
+  contextRef.current = context;
+  const toneRef = useRef(tone);
+  toneRef.current = tone;
+  const wordTargetRef = useRef(wordTarget);
+  wordTargetRef.current = wordTarget;
+  const customWordTargetRef = useRef(customWordTarget);
+  customWordTargetRef.current = customWordTarget;
+  const editingControlsRef = useRef(editingControls);
+  editingControlsRef.current = editingControls;
+  const developerModeRef = useRef(developerMode);
+  developerModeRef.current = developerMode;
+  const aiPresetRef = useRef(aiPreset);
+  aiPresetRef.current = aiPreset;
+  const structureGeneratorRef = useRef(structureGenerator);
+  structureGeneratorRef.current = structureGenerator;
+  const customStyleGuideRef = useRef(customStyleGuide);
+  customStyleGuideRef.current = customStyleGuide;
+
   // Variants State
   const [variants, setVariants] = useState<string[]>([]);
   const [showVariants, setShowVariants] = useState(false);
@@ -195,6 +244,13 @@ function AppContent({ session }: { session: AuthSession }) {
       setShowUpgradeModal(true);
       return;
     }
+
+    // Cancel any pending live refinement
+    if (liveRefineTimerRef.current) {
+      clearTimeout(liveRefineTimerRef.current);
+      liveRefineTimerRef.current = null;
+    }
+
     setIsProcessing(true);
     try {
       await checkAndIncrementUsage({});
@@ -215,6 +271,9 @@ function AppContent({ session }: { session: AuthSession }) {
       const result = await refineAction({ prompt, optimizationPrompt });
       setOutputText(result);
       setMobileTab('output');
+
+      lastLiveRefinedInputRef.current = inputText;
+
       await saveRefinement({
         label: `${processingMode} — ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
         inputText,
@@ -286,6 +345,84 @@ function AppContent({ session }: { session: AuthSession }) {
     setShowVariants(false);
     setVariants([]);
   };
+
+  // ─── Live Refinement ──────────────────────────────────────────────────────
+  const handleLiveRefine = useCallback(async () => {
+    const currentInput = inputTextRef.current;
+    if (!currentInput.trim() || isProcessingRef.current) return;
+    if (currentInput === lastLiveRefinedInputRef.current) return;
+    if (!isProRef.current) return;
+
+    setIsProcessing(true);
+    try {
+      let textToRefine = currentInput;
+      let prefix = '';
+      let contextText = '';
+      let shouldMerge = false;
+
+      if (liveRefinementModeRef.current === 'sentence') {
+        const { beforeLastSentence, lastSentence } = extractLastSentence(currentInput);
+        if (lastSentence.trim()) {
+          textToRefine = lastSentence;
+          prefix = beforeLastSentence;
+          contextText = beforeLastSentence;
+          shouldMerge = true;
+        }
+      }
+
+      const effectiveWordTarget = wordTargetRef.current === 'custom'
+        ? customWordTargetRef.current
+        : wordTargetRef.current;
+      const options: RefineOptions = {
+        processingMode: processingModeRef.current,
+        context: contextRef.current,
+        tone: toneRef.current as ToneOption,
+        developerMode: developerModeRef.current,
+        editingControls: editingControlsRef.current,
+        aiPreset: aiPresetRef.current,
+        structureGenerator: structureGeneratorRef.current,
+        optimizationPass: false,
+        wordTarget: effectiveWordTarget || 'none',
+        customStyleGuide: customStyleGuideRef.current,
+      };
+
+      const prompt = shouldMerge && contextText
+        ? buildSentenceRefinePrompt(contextText, textToRefine, options)
+        : buildRefinePrompts(textToRefine, options).prompt;
+      const result = await refineAction({ prompt });
+
+      if (inputTextRef.current !== currentInput) return;
+
+      if (shouldMerge && prefix) {
+        setOutputText(prefix + ' ' + result);
+      } else {
+        setOutputText(result);
+      }
+
+      lastLiveRefinedInputRef.current = currentInput;
+    } catch (error: any) {
+      console.error('[Live Refine]', error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [refineAction]);
+
+  // Debounce effect for live refinement
+  useEffect(() => {
+    if (!liveRefinementEnabled || !inputText.trim() || isProcessing) return;
+    if (inputText === lastLiveRefinedInputRef.current) return;
+
+    if (liveRefineTimerRef.current) clearTimeout(liveRefineTimerRef.current);
+
+    liveRefineTimerRef.current = setTimeout(handleLiveRefine, 1500);
+
+    return () => {
+      if (liveRefineTimerRef.current) {
+        clearTimeout(liveRefineTimerRef.current);
+        liveRefineTimerRef.current = null;
+      }
+    };
+  }, [inputText, liveRefinementEnabled, isProcessing, handleLiveRefine]);
 
   const handleSaveTemplate = async () => {
     if (!inputText.trim()) return;
@@ -382,6 +519,60 @@ function AppContent({ session }: { session: AuthSession }) {
               Pro
             </button>
           </p>
+        )}
+      </section>
+
+      {/* Live Refinement - Pro only */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Live Refinement</span>
+          <Switch
+            checked={liveRefinementEnabled}
+            onCheckedChange={(checked) => {
+              if (checked && !isPro) {
+                setShowUpgradeModal(true);
+                return;
+              }
+              setLiveRefinementEnabled(checked);
+              if (!checked && liveRefineTimerRef.current) {
+                clearTimeout(liveRefineTimerRef.current);
+                liveRefineTimerRef.current = null;
+              }
+            }}
+            className="shrink-0"
+          />
+        </div>
+        {!isPro && (
+          <p className="text-[11px] text-muted-foreground/50">
+            Auto-refines your text as you type. Available on{' '}
+            <button onClick={() => setShowUpgradeModal(true)} className="text-primary hover:underline">
+              Pro
+            </button>
+          </p>
+        )}
+        {liveRefinementEnabled && (
+          <div className="rounded-xl bg-muted/30 border border-border/40 p-3 space-y-3">
+            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+              {liveRefinementMode === 'full'
+                ? 'Automatically refines the full document as you type.'
+                : 'Automatically refines each sentence after a pause.'}
+            </p>
+            <section className="space-y-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground/60">Mode</span>
+              <Select
+                value={liveRefinementMode}
+                onValueChange={(v) => setLiveRefinementMode(v as 'full' | 'sentence')}
+              >
+                <SelectTrigger className="w-full h-8 text-sm bg-background/60 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full">Full Document</SelectItem>
+                  <SelectItem value="sentence">Per Sentence</SelectItem>
+                </SelectContent>
+              </Select>
+            </section>
+          </div>
         )}
       </section>
 
