@@ -1,14 +1,36 @@
 "use node";
 import { v } from "convex/values";
 import { action } from "./_generated/server";
-import Groq from "groq-sdk";
 
 const MODEL = "llama-3.3-70b-versatile";
+const GROQ_API_BASE = "https://api.groq.com/openai/v1";
 
-function getGroq() {
+async function callGroq(prompt: string): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("GROQ_API_KEY is not set in Convex environment variables.");
-  return new Groq({ apiKey, maxRetries: 2, timeout: 30000 });
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is not set in Convex environment variables.");
+  }
+
+  const response = await fetch(`${GROQ_API_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 4096,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Groq API error (${response.status}): ${body}`);
+  }
+
+  const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+  return data.choices[0]?.message?.content ?? "";
 }
 
 export const refine = action({
@@ -17,23 +39,9 @@ export const refine = action({
     optimizationPrompt: v.optional(v.string()),
   },
   handler: async (_, args) => {
-    const groq = getGroq();
-    const response = await groq.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "user", content: args.prompt }],
-    });
-
-    let refinedText = response.choices[0]?.message?.content || "";
-
-    if (args.optimizationPrompt) {
-      const optResponse = await groq.chat.completions.create({
-        model: MODEL,
-        messages: [{ role: "user", content: args.optimizationPrompt }],
-      });
-      refinedText = optResponse.choices[0]?.message?.content || refinedText;
-    }
-
-    return refinedText;
+    const refinedText = await callGroq(args.prompt);
+    if (!args.optimizationPrompt) return refinedText;
+    return await callGroq(args.optimizationPrompt);
   },
 });
 
@@ -42,13 +50,7 @@ export const generateVariants = action({
     prompt: v.string(),
   },
   handler: async (_, args) => {
-    const groq = getGroq();
-    const response = await groq.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "user", content: args.prompt }],
-    });
-
-    const raw = response.choices[0]?.message?.content ?? "";
+    const raw = await callGroq(args.prompt);
     return raw.split("---VARIANT---").map((s) => s.trim()).filter(Boolean);
   },
 });
