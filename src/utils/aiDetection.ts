@@ -4,6 +4,8 @@ export interface AIDetectionScore {
   buzzwordCount: number;
   roboticPhraseCount: number;
   burstinessScore: number; // 0–100, higher = more varied (human-like)
+  whStarterCount: number;  // NEW: sentences starting with Wh-/How
+  adverbCount: number;     // NEW: filler adverbs (really, just, literally, etc.)
 }
 
 // ─── Signal Lists ─────────────────────────────────────────────────────────────
@@ -52,6 +54,9 @@ const ROBOTIC_TRANSITIONS = [
   "first and foremost","first things first","on the other hand","by the same token",
   "case in point","for instance","for example","in other words","to put it simply",
   "simply put","in a nutshell","to be fair","to be clear","to clarify","notably",
+  // Stop Slop additions
+  "full stop","let that sink in","make no mistake","here's why that matters",
+  "this matters because",
 ];
 
 /** Hedge/qualifier phrases overused by AI to sound careful */
@@ -80,7 +85,29 @@ const AI_STRUCTURAL_MARKERS = [
   "key takeaways","the good news is","the bad news is","the fact is",
   "the truth is","the reality is","here's the thing","here is the thing",
   "at its core","at the end of the day","in the grand scheme",
+  // Stop Slop: throat-clearing openers
+  "here's the problem","here is the problem","here's what i find interesting",
+  "here's what i mean","here is what i mean","the uncomfortable truth",
+  "it turns out","let me be clear","i'm going to be honest","i'll say it again",
+  "can we talk about","here's why","here's what",
+  // Stop Slop: meta-commentary
+  "plot twist","spoiler alert","let me walk you through",
+  "the rest of this","in this section we'll","as we'll see",
+  "i want to explore","hint:",
 ];
+
+/** Filler adverbs that AI overuses for empty emphasis */
+const COMMON_ADVERBS = new Set([
+  "really","just","literally","genuinely","honestly","simply","actually",
+  "deeply","truly","fundamentally","inherently","inevitably","interestingly",
+  "importantly","crucially","essentially","basically","practically","virtually",
+  "absolutely","utterly","totally","completely","entirely","highly",
+  "significantly","remarkably","notably","particularly","increasingly",
+  "ultimately","undoubtedly","certainly","surely","definitely","indeed",
+]);
+
+/** Wh- words that start sentences in formulaic AI prose */
+const WH_STARTERS = new Set(["what","when","where","which","who","why","how"]);
 
 // ─── Statistical Helpers ──────────────────────────────────────────────────────
 
@@ -134,6 +161,26 @@ function computeListRatio(text: string): number {
   return (listLines / lines.length) * 100;
 }
 
+/** Count sentences that start with Wh- words or How — a classic AI structural crutch */
+function countWhStarters(sentences: string[]): number {
+  let count = 0;
+  for (const s of sentences) {
+    const first = s.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+    if (WH_STARTERS.has(first)) count++;
+  }
+  return count;
+}
+
+/** Count filler adverb occurrences in word list */
+function countAdverbs(words: string[]): number {
+  let count = 0;
+  for (const word of words) {
+    const w = word.replace(/[^a-z]/g, "");
+    if (COMMON_ADVERBS.has(w)) count++;
+  }
+  return count;
+}
+
 /** Phrase density helper: occurrences per 100 words */
 function countPhrases(clean: string, phrases: string[]): number {
   let count = 0;
@@ -151,7 +198,7 @@ export function scoreAILikelihood(text: string): AIDetectionScore {
   const wordCount = words.length;
 
   if (wordCount < 20) {
-    return { score: 0, label: "Too short", buzzwordCount: 0, roboticPhraseCount: 0, burstinessScore: 50 };
+    return { score: 0, label: "Too short", buzzwordCount: 0, roboticPhraseCount: 0, burstinessScore: 50, whStarterCount: 0, adverbCount: 0 };
   }
 
   const sentences = getSentences(text);
@@ -195,15 +242,28 @@ export function scoreAILikelihood(text: string): AIDetectionScore {
   const listRatio = computeListRatio(text);
   const listScore = Math.min(100, listRatio * 1.5);
 
+  // ── Signal 9: Wh- sentence starters (weight 0.03) ─────────────────────────
+  // AI overuses "What makes this hard is...", "Why this matters..." structures
+  const whStarterCount = countWhStarters(sentences);
+  const whStarterProportion = sentences.length > 0 ? whStarterCount / sentences.length : 0;
+  const whStarterScore = Math.min(100, whStarterProportion * 100 * 3);
+
+  // ── Signal 10: Filler adverb density (weight 0.02) ────────────────────────
+  // "really", "just", "literally", "simply", "actually" — empty emphasis
+  const adverbCount = countAdverbs(words);
+  const adverbScore = Math.min(100, (adverbCount / wordCount) * 100 * 15);
+
   const score = Math.round(
-    buzzScore    * 0.18 +
+    buzzScore    * 0.16 +
     roboticScore * 0.12 +
     hedgeScore   * 0.13 +
     structureScore * 0.10 +
-    burstScore   * 0.20 +
+    burstScore   * 0.17 +
     starterScore * 0.12 +
     passiveScore * 0.08 +
-    listScore    * 0.07
+    listScore    * 0.07 +
+    whStarterScore * 0.03 +
+    adverbScore  * 0.02
   );
 
   const label =
@@ -217,5 +277,7 @@ export function scoreAILikelihood(text: string): AIDetectionScore {
     buzzwordCount,
     roboticPhraseCount,
     burstinessScore: Math.round(burstiness),
+    whStarterCount,
+    adverbCount,
   };
 }

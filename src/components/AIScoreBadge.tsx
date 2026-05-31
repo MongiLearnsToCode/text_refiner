@@ -14,7 +14,7 @@ export function AIScoreBadge({ score }: AIScoreBadgeProps) {
   return (
     <span
       className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${scoreColor(score.score)}`}
-      title={`AI likelihood: ${score.score}/100 · ${score.buzzwordCount} buzzwords · ${score.roboticPhraseCount} robotic phrases · burstiness: ${score.burstinessScore}`}
+      title={`AI likelihood: ${score.score}/100 · ${score.buzzwordCount} buzzwords · ${score.roboticPhraseCount} robotic phrases · burstiness: ${score.burstinessScore} · ${score.whStarterCount} Wh-starters · ${score.adverbCount} adverbs`}
     >
       AI {score.score} · {score.label}
     </span>
