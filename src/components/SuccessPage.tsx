@@ -24,7 +24,7 @@ export function SuccessPage({ onContinue }: SuccessPageProps) {
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold text-foreground">You're now on Pro</h1>
           <p className="text-muted-foreground text-sm">
-            Your subscription is active. Everything is unlocked.
+            Pro is active. Everything is unlocked.
           </p>
         </div>
 

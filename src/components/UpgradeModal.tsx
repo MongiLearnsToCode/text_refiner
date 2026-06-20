@@ -41,7 +41,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
       const { url } = await createCheckout({});
       window.location.href = url;
     } catch (err: any) {
-      setError(err.message ?? "Something went wrong. Please try again.");
+      setError(err.message ?? "Something went wrong. Try again.");
       setLoading(false);
     }
   };
@@ -56,7 +56,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
         <div className="px-6 py-5 flex items-start justify-between border-b border-border">
           <div>
             <h2 className="text-xl font-semibold text-foreground">Upgrade to Pro</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Unlock everything, no limits.</p>
+            <p className="text-sm text-muted-foreground mt-0.5">$12/mo. All modes. No cap.</p>
           </div>
           <button
             onClick={onClose}
@@ -136,7 +136,7 @@ export function UpgradeModal({ onClose }: UpgradeModalProps) {
         )}
 
         <p className="px-6 pb-5 text-center text-xs text-muted-foreground/60">
-          Secure payment via Stripe · Cancel anytime from account settings
+          Paid via Stripe. Cancel from your account settings.
         </p>
       </div>
     </div>

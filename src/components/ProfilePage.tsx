@@ -34,7 +34,7 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
       setShowCancelConfirm(false);
       toast.success("Subscription cancelled.");
     } catch {
-      toast.error("Could not cancel subscription. Please try again.");
+      toast.error("Could not cancel subscription. Try again.");
     } finally {
       setCancelLoading(false);
     }
@@ -46,7 +46,7 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
       await resumeSubscription({});
       toast.success("Subscription resumed.");
     } catch {
-      toast.error("Could not resume subscription. Please try again.");
+      toast.error("Could not resume subscription. Try again.");
     } finally {
       setResumeLoading(false);
     }
@@ -110,13 +110,13 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
                 <h3 className="text-xl font-extrabold text-foreground">{isPro ? "Pro Plan" : "Free Plan"}</h3>
                 <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
                   {isPro
-                    ? "You have full access to all refinement modes and unlimited usage."
-                    : "Unlock advanced AI tools and unlimited refinements to elevate your writing."}
+                    ? "Full access to all modes. Unlimited usage."
+                    : "Get all 7 modes and unlimited refinements."}
                 </p>
               </div>
               {cancelAtPeriodEnd && (
                 <p className="text-xs text-amber-600 bg-amber-500/10 rounded-lg px-3 py-2">
-                  Your subscription will cancel at the end of the current billing period.
+                  Your subscription cancels at the end of this billing period.
                 </p>
               )}
             </div>
@@ -149,7 +149,7 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
                   ) : showCancelConfirm ? (
                     <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                       <p className="text-xs text-foreground font-medium">
-                        Your subscription will remain active until the end of the billing period, then will not renew.
+                        Active until the end of this billing period, then it stops.
                       </p>
                       <div className="flex gap-2">
                         <Button

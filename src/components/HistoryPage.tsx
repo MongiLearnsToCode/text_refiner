@@ -214,7 +214,7 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
             <Clock className="w-10 h-10 text-muted-foreground/40 mb-4" />
             <p className="text-muted-foreground font-medium">No refinements yet</p>
             <p className="text-sm text-muted-foreground/60 mt-1">
-              Refinements are saved automatically when you use the editor.
+              Refinements save automatically when you use the editor.
             </p>
             <Button variant="outline" onClick={onBack} className="mt-6 gap-2">
               <ArrowLeft className="w-4 h-4" />
@@ -225,7 +225,7 @@ export function HistoryPage({ onLoadRefinement, onBack, isPro, onUpgrade }: Hist
           <div className="flex flex-col items-center justify-center py-32 text-center">
             <Search className="w-10 h-10 text-muted-foreground/40 mb-4" />
             <p className="text-muted-foreground font-medium">No results match your filters</p>
-            <p className="text-sm text-muted-foreground/60 mt-1">Try adjusting the search or filter criteria.</p>
+            <p className="text-sm text-muted-foreground/60 mt-1">Try a different search or filter.</p>
             <button
               onClick={() => { setSearchQuery(""); setModeFilter("all"); setDateFilter("all"); }}
               className="mt-4 text-sm text-primary hover:underline"

@@ -6,6 +6,8 @@ import { parseVariantsResponse } from './services/variantsService';
 import { PromptVersion, ToneOption } from './types';
 import { fleschKincaid } from '@/utils/readability';
 import { scorePrompt } from '@/utils/promptScore';
+import { scoreAILikelihood } from '@/utils/aiDetection';
+import { AIScoreBadge } from '@/components/AIScoreBadge';
 import Markdown from 'react-markdown';
 import { Toaster, toast } from 'sonner';
 import { Copy, ArrowRightLeft, Loader2, Check, Pin, PinOff, Trash2, History, GitCompare, Shuffle, ChevronDown, FileText, FileDown, BookmarkPlus, Lock, Zap, User, ClipboardPaste, SlidersHorizontal, X } from 'lucide-react';
@@ -229,6 +231,13 @@ function AppContent({ session }: { session: AuthSession }) {
   // Readability scores — Pro only
   const inputScore = useMemo(() => isPro && inputText.trim() ? fleschKincaid(inputText) : null, [isPro, inputText]);
   const outputScore = useMemo(() => isPro && outputText.trim() ? fleschKincaid(outputText) : null, [isPro, outputText]);
+
+  // AI detection score — always available for De-AI mode, Pro otherwise
+  const showAiScore = processingMode === "De-AI / Humanize Text" || isPro;
+  const aiScore = useMemo(() =>
+    showAiScore && outputText.trim() ? scoreAILikelihood(outputText) : null,
+    [showAiScore, outputText]
+  );
 
   // Prompt quality score (Developer Mode only)
   const promptScore = useMemo(() => developerMode && outputText.trim().split(/\s+/).length >= 10 ? scorePrompt(outputText) : null, [developerMode, outputText]);
@@ -544,7 +553,7 @@ function AppContent({ session }: { session: AuthSession }) {
         </div>
         {!isPro && (
           <p className="text-[11px] text-muted-foreground/50">
-            Auto-refines your text as you type. Available on{' '}
+            Refines text as you type. On{' '}
             <button onClick={() => setShowUpgradeModal(true)} className="text-primary hover:underline">
               Pro
             </button>
@@ -554,8 +563,8 @@ function AppContent({ session }: { session: AuthSession }) {
           <div className="rounded-xl bg-muted/30 border border-border/40 p-3 space-y-3">
             <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
               {liveRefinementMode === 'full'
-                ? 'Automatically refines the full document as you type.'
-                : 'Automatically refines each sentence after a pause.'}
+                ? 'Refines the full document while you type.'
+                : 'Refines each sentence after you pause.'}
             </p>
             <section className="space-y-1.5">
               <span className="text-[11px] font-medium text-muted-foreground/60">Mode</span>
@@ -675,7 +684,7 @@ function AppContent({ session }: { session: AuthSession }) {
           </button>
           {styleGuideOpen && (
             <div className="space-y-1.5">
-              <p className="text-[11px] text-muted-foreground/60 leading-relaxed">Brand voice rules applied during Comprehensive Refinement.</p>
+              <p className="text-[11px] text-muted-foreground/60 leading-relaxed">Voice rules for Comprehensive Refinement.</p>
               <Textarea
                 value={customStyleGuide}
                 onChange={(e) => setCustomStyleGuide(e.target.value)}
@@ -700,7 +709,7 @@ function AppContent({ session }: { session: AuthSession }) {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground leading-tight">Developer Mode</p>
-              <p className="text-[11px] text-muted-foreground/60 mt-0.5 leading-snug">Turn text into structured AI prompts.</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-0.5 leading-snug">Rough notes into AI-ready prompts.</p>
             </div>
             <Switch checked={developerMode} onCheckedChange={setDeveloperMode} className="shrink-0" />
           </div>
@@ -752,7 +761,7 @@ function AppContent({ session }: { session: AuthSession }) {
                   </button>
                 </div>
                 {templates.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground/40 italic">No saved templates yet.</p>
+                  <p className="text-[11px] text-muted-foreground/40 italic">No saved templates.</p>
                 ) : (
                   <div className="space-y-1 max-h-40 overflow-y-auto pr-0.5">
                     {templates.map((t) => (
@@ -793,11 +802,11 @@ function AppContent({ session }: { session: AuthSession }) {
     <div className="bg-muted/50 border-b border-border px-4 py-2 flex items-center justify-between gap-2 shrink-0">
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
         <h3 className="text-sm font-medium text-foreground shrink-0">Refined Output</h3>
-        {!isPro && outputText && !developerMode && (
+        {!isPro && outputText && !developerMode && processingMode !== "De-AI / Humanize Text" && (
           <button
             onClick={() => setShowUpgradeModal(true)}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-primary transition-colors"
-            title="Readability scores available on Pro"
+            title="AI detection and readability scores available on Pro"
           >
             <Lock className="w-3 h-3" />
             Scores
@@ -814,6 +823,9 @@ function AppContent({ session }: { session: AuthSession }) {
           >
             {promptScore.label}
           </span>
+        )}
+        {aiScore && !developerMode && (
+          <AIScoreBadge score={aiScore} />
         )}
         {outputText && inputText && (
           <button
@@ -893,21 +905,67 @@ function AppContent({ session }: { session: AuthSession }) {
     </div>
   );
 
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
+
   const outputPanelBody = (
     <div className="flex-1 p-4 md:p-6 overflow-y-auto prose prose-sm max-w-none font-editor">
       {outputText ? (
-        showDiff && inputText ? (
-          <DiffView
-            original={inputText}
-            revised={outputText}
-            onApply={(text) => { setOutputText(text); setShowDiff(false); }}
-          />
-        ) : (
-          <Markdown>{outputText}</Markdown>
-        )
+        <>
+          {showDiff && inputText ? (
+            <DiffView
+              original={inputText}
+              revised={outputText}
+              onApply={(text) => { setOutputText(text); setShowDiff(false); }}
+            />
+          ) : (
+            <Markdown>{outputText}</Markdown>
+          )}
+          {aiScore && !developerMode && aiScore.flags.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border/40">
+              <button
+                onClick={() => setShowDiagnostic(!showDiagnostic)}
+                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform ${showDiagnostic ? 'rotate-90' : ''}`}
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+                Human-edit diagnostic — {aiScore.flags.length} pattern{aiScore.flags.length !== 1 ? 's' : ''} flagged
+              </button>
+              {showDiagnostic && (
+                <div className="mt-2 space-y-1.5">
+                  {aiScore.flags.map((flag, i) => {
+                    const severityColor =
+                      flag.severity === 'high' ? 'text-red-600 bg-red-50 border-red-200' :
+                      flag.severity === 'medium' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' :
+                      'text-blue-600 bg-blue-50 border-blue-200';
+                    const severityDot =
+                      flag.severity === 'high' ? 'bg-red-500' :
+                      flag.severity === 'medium' ? 'bg-yellow-500' :
+                      'bg-blue-500';
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-start gap-2 px-2.5 py-1.5 rounded-md border text-xs leading-relaxed ${severityColor}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${severityDot}`} />
+                        <div>
+                          <span className="font-medium">{flag.category}: </span>
+                          {flag.detail}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm font-sans">
-          Refined text will appear here...
+          Your cleaned-up text shows up here.
         </div>
       )}
     </div>
@@ -921,7 +979,7 @@ function AppContent({ session }: { session: AuthSession }) {
         <header className="bg-card border-b border-border px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10 shrink-0">
           <div>
             <h1 className="text-lg md:text-xl font-semibold text-foreground leading-tight">Finer Text</h1>
-            <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">Turn messy text into clean, professional writing.</p>
+            <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">Messy text in. Clean copy out.</p>
           </div>
           <div className="flex items-center gap-1.5 md:gap-3">
             <span className="text-sm text-muted-foreground hidden lg:block">{session.user.email}</span>
@@ -1111,7 +1169,7 @@ function AppContent({ session }: { session: AuthSession }) {
               <Textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Paste your rough text or messy ideas here..."
+                placeholder="Paste a draft, notes, or anything rough."
                 className="flex-1 w-full p-4 resize-none border-0 rounded-none focus-visible:ring-0 text-foreground shadow-none bg-transparent text-base font-editor leading-[30px]"
               />
             </div>
@@ -1173,7 +1231,7 @@ function AppContent({ session }: { session: AuthSession }) {
               <Textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Paste your rough text or messy ideas here..."
+                placeholder="Paste a draft, notes, or anything rough."
                 className="flex-1 w-full p-4 resize-none border-0 rounded-none focus-visible:ring-0 text-foreground shadow-none bg-transparent font-editor leading-[30px]"
               />
             </div>
