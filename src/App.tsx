@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useMutation, useQuery, useAction } from 'convex/react';
+import { useMutation, useQuery, useAction, useConvexAuth } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { buildRefinePrompts, buildSentenceRefinePrompt, buildVariantsPrompt, RefineOptions } from './services/groqService';
 import { parseVariantsResponse } from './services/variantsService';
@@ -96,9 +96,10 @@ function extractLastSentence(text: string): { beforeLastSentence: string; lastSe
 
 export default function App() {
   const { data: session, isPending } = authClient.useSession();
+  const { isLoading: isConvexLoading, isAuthenticated } = useConvexAuth();
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot-password' | 'reset-password'>('signin');
 
-  if (isPending) {
+  if (isPending || (session && isConvexLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -120,6 +121,15 @@ export default function App() {
           onForgotPassword={() => setAuthView('forgot-password')}
         />;
     }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-sm text-muted-foreground">Your sign-in could not be verified. Please sign in again.</p>
+        <Button onClick={() => void authClient.signOut()}>Sign out</Button>
+      </div>
+    );
   }
 
   return <AppContent session={session} />;
