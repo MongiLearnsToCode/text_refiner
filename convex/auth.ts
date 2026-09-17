@@ -1,8 +1,9 @@
 import { createClient, type GenericCtx } from "@convex-dev/better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
 import { components } from "./_generated/api";
-import { query } from "./_generated/server";
+import { internalAction, query } from "./_generated/server";
 import { betterAuth, type BetterAuthOptions } from "better-auth/minimal";
+import { v } from "convex/values";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
 
@@ -28,6 +29,18 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth(createAuthOptions(ctx));
+
+// Rotate the JWT signing keys after changing BETTER_AUTH_SECRET. Better Auth
+// encrypts stored private keys with that secret, so the old keys cannot be
+// decrypted after a secret rotation.
+export const rotateSigningKeys = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    await createAuth(ctx).api.rotateKeys();
+    return null;
+  },
+});
 
 export const getCurrentUser = query({
   args: {},
