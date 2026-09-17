@@ -2,7 +2,9 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
-const MODEL = "llama-3.3-70b-versatile";
+// Groq retired `llama-3.3-70b-versatile` for developer/free-tier projects on
+// August 16, 2026. Keep this aligned with a currently supported model.
+const MODEL = "openai/gpt-oss-120b";
 const GROQ_API_BASE = "https://api.groq.com/openai/v1";
 
 async function callGroq(prompt: string): Promise<string> {
@@ -38,6 +40,7 @@ export const refine = action({
     prompt: v.string(),
     optimizationPrompt: v.optional(v.string()),
   },
+  returns: v.string(),
   handler: async (_, args) => {
     const refinedText = await callGroq(args.prompt);
     if (!args.optimizationPrompt) return refinedText;
@@ -49,6 +52,7 @@ export const generateVariants = action({
   args: {
     prompt: v.string(),
   },
+  returns: v.array(v.string()),
   handler: async (_, args) => {
     const raw = await callGroq(args.prompt);
     return raw.split("---VARIANT---").map((s) => s.trim()).filter(Boolean);
