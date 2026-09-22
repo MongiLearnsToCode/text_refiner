@@ -1,25 +1,80 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+
+const planValidator = v.union(v.literal("free"), v.literal("pro"));
+
+function isDeveloperEmail(email: string | undefined): boolean {
+  const developerEmails = (process.env.DEVELOPER_ACCOUNT_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return email !== undefined && developerEmails.includes(email.toLowerCase());
+}
 
 // ─── Public queries ────────────────────────────────────────────────────────────
 
 export const getUserPlan = query({
   args: {},
+  returns: v.object({
+    plan: planValidator,
+    cancelAtPeriodEnd: v.optional(v.boolean()),
+    isDeveloper: v.boolean(),
+  }),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return { plan: "free" as const };
+    if (!identity) return { plan: "free" as const, isDeveloper: false };
 
     const sub = await ctx.db
       .query("subscriptions")
       .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
       .unique();
 
-    if (!sub || sub.plan !== "pro") return { plan: "free" as const };
+    const isDeveloper = isDeveloperEmail(identity.email);
+    const plan = isDeveloper && sub?.developerOverride
+      ? sub.developerOverride
+      : sub?.plan ?? "free";
 
     return {
-      plan: "pro" as const,
-      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      plan,
+      isDeveloper,
+      ...(plan === "pro" && sub?.cancelAtPeriodEnd !== undefined
+        ? { cancelAtPeriodEnd: sub.cancelAtPeriodEnd }
+        : {}),
     };
+  },
+});
+
+/**
+ * Lets a configured developer test either entitlement without creating or
+ * changing a real subscription. Authorization is enforced by the backend.
+ */
+export const setDeveloperPlan = mutation({
+  args: { plan: planValidator },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    if (!isDeveloperEmail(identity.email)) {
+      throw new Error("Developer plan controls are not available for this account.");
+    }
+
+    const existing = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { developerOverride: args.plan });
+    } else {
+      await ctx.db.insert("subscriptions", {
+        userId: identity.tokenIdentifier,
+        plan: "free",
+        developerOverride: args.plan,
+      });
+    }
+
+    return null;
   },
 });
 

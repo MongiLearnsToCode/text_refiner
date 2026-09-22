@@ -1,8 +1,8 @@
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Zap, Check, Loader2, LogOut, Sparkles, Shield, Activity, X } from "lucide-react";
+import { ArrowLeft, Zap, Check, Loader2, LogOut, Sparkles, Shield, Activity, X, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import type { AuthSession } from "../App";
@@ -14,13 +14,20 @@ interface ProfilePageProps {
 }
 
 export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
-  const planData = useQuery(api.subscriptions.getUserPlan) ?? { plan: "free" as const };
+  const queriedPlanData = useQuery(api.subscriptions.getUserPlan);
+  // The guard keeps the UI safe while generated Convex types refresh after a
+  // backend deployment. The server always returns `isDeveloper`.
+  const planData = queriedPlanData && "isDeveloper" in queriedPlanData
+    ? queriedPlanData
+    : { plan: "free" as const, isDeveloper: false };
   const usageData = useQuery(api.usage.getUsage) ?? { count: 0, limit: 20 };
   const cancelSubscription = useAction(api.polarActions.cancelSubscription);
   const resumeSubscription = useAction(api.polarActions.resumeSubscription);
+  const setDeveloperPlan = useMutation(api.subscriptions.setDeveloperPlan);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [developerPlanLoading, setDeveloperPlanLoading] = useState<"free" | "pro" | null>(null);
 
   const isPro = planData.plan === "pro";
   const cancelAtPeriodEnd = isPro && (planData as any).cancelAtPeriodEnd;
@@ -49,6 +56,18 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
       toast.error("Could not resume subscription. Try again.");
     } finally {
       setResumeLoading(false);
+    }
+  };
+
+  const handleDeveloperPlanChange = async (plan: "free" | "pro") => {
+    setDeveloperPlanLoading(plan);
+    try {
+      await setDeveloperPlan({ plan });
+      toast.success(`Developer plan set to ${plan === "pro" ? "Pro" : "Free"}.`);
+    } catch {
+      toast.error("Could not change the developer plan.");
+    } finally {
+      setDeveloperPlanLoading(null);
     }
   };
 
@@ -93,6 +112,36 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
           </div>
         </section>
 
+        {planData.isDeveloper && (
+          <section className="bg-primary/5 rounded-xl border border-primary/20 p-5 md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-primary/10 rounded-xl">
+                <Wrench className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-sm font-bold text-foreground">Developer plan controls</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Switch entitlements for testing. This never changes your Polar subscription.
+                </p>
+                <div className="flex gap-2 mt-4">
+                  {(["free", "pro"] as const).map((plan) => (
+                    <Button
+                      key={plan}
+                      size="sm"
+                      variant={planData.plan === plan ? "default" : "outline"}
+                      disabled={developerPlanLoading !== null}
+                      onClick={() => handleDeveloperPlanChange(plan)}
+                    >
+                      {developerPlanLoading === plan && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {plan === "pro" ? "Pro" : "Free"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Bento grid: Subscription + Usage */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-5">
           {/* Subscription card */}
@@ -133,7 +182,11 @@ export function ProfilePage({ session, onBack, onUpgrade }: ProfilePageProps) {
                   </li>
                 ))}
               </ul>
-              {isPro ? (
+              {planData.isDeveloper ? (
+                <p className="rounded-lg bg-primary/10 px-3 py-2 text-center text-xs font-medium text-primary">
+                  Plan changes are managed with the developer controls above.
+                </p>
+              ) : isPro ? (
                 <>
                   {cancelAtPeriodEnd ? (
                     <Button
