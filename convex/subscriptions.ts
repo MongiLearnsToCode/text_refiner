@@ -3,15 +3,6 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 
 const planValidator = v.union(v.literal("free"), v.literal("pro"));
 
-function isDeveloperEmail(email: string | undefined): boolean {
-  const developerEmails = (process.env.DEVELOPER_ACCOUNT_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  return email !== undefined && developerEmails.includes(email.toLowerCase());
-}
-
 // ─── Public queries ────────────────────────────────────────────────────────────
 
 export const getUserPlan = query({
@@ -30,7 +21,7 @@ export const getUserPlan = query({
       .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
       .unique();
 
-    const isDeveloper = isDeveloperEmail(identity.email);
+    const isDeveloper = sub?.isDeveloper ?? false;
     const plan = isDeveloper && sub?.developerOverride
       ? sub.developerOverride
       : sub?.plan ?? "free";
@@ -55,22 +46,38 @@ export const setDeveloperPlan = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    if (!isDeveloperEmail(identity.email)) {
-      throw new Error("Developer plan controls are not available for this account.");
-    }
-
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_userId", (q) => q.eq("userId", identity.tokenIdentifier))
       .unique();
 
+    if (!existing?.isDeveloper) {
+      throw new Error("Developer plan controls are not available for this account.");
+    }
+
+    await ctx.db.patch(existing._id, { developerOverride: args.plan });
+
+    return null;
+  },
+});
+
+/** Called only by the action that reads the deployment's developer allow-list. */
+export const setDeveloperAccess = internalMutation({
+  args: { userId: v.string(), isDeveloper: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .unique();
+
     if (existing) {
-      await ctx.db.patch(existing._id, { developerOverride: args.plan });
+      await ctx.db.patch(existing._id, { isDeveloper: args.isDeveloper });
     } else {
       await ctx.db.insert("subscriptions", {
-        userId: identity.tokenIdentifier,
+        userId: args.userId,
         plan: "free",
-        developerOverride: args.plan,
+        isDeveloper: args.isDeveloper,
       });
     }
 

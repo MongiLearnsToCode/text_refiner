@@ -12,7 +12,33 @@ function polar() {
   return new Polar({ accessToken: token, server });
 }
 
+function isDeveloperEmail(email: string | undefined): boolean {
+  const developerEmails = (process.env.DEVELOPER_ACCOUNT_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return email !== undefined && developerEmails.includes(email.toLowerCase());
+}
+
 // ─── Public actions ────────────────────────────────────────────────────────────
+
+/** Synchronizes the authenticated account with the deployment's allow-list. */
+export const syncDeveloperAccess = action({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    await ctx.runMutation(internal.subscriptions.setDeveloperAccess, {
+      userId: identity.tokenIdentifier,
+      isDeveloper: isDeveloperEmail(identity.email),
+    });
+
+    return null;
+  },
+});
 
 export const createCheckoutSession = action({
   args: {},

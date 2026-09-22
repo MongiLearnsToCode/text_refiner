@@ -145,6 +145,7 @@ function AppContent({ session }: { session: AuthSession }) {
   const saveTemplate = useMutation(api.promptTemplates.save);
   const removeTemplate = useMutation(api.promptTemplates.remove);
   const templates = useQuery(api.promptTemplates.list) ?? [];
+  const syncDeveloperAccess = useAction(api.polarActions.syncDeveloperAccess);
   const refineAction = useAction(api.llm.refine);
   const generateVariantsAction = useAction(api.llm.generateVariants);
 
@@ -155,6 +156,12 @@ function AppContent({ session }: { session: AuthSession }) {
     const params = new URLSearchParams(window.location.search);
     return params.get('upgraded') === 'true';
   });
+
+  useEffect(() => {
+    void syncDeveloperAccess({}).catch(() => {
+      // A failed synchronization simply leaves normal billing entitlements in place.
+    });
+  }, [syncDeveloperAccess]);
 
   useEffect(() => {
     if (showSuccess) {

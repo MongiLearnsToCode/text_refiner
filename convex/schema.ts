@@ -32,6 +32,8 @@ export default defineSchema({
     // separate from the provider-managed `plan`, so testing plans never
     // changes a Polar subscription or is overwritten by a webhook.
     developerOverride: v.optional(v.union(v.literal("free"), v.literal("pro"))),
+    // Set only by the server-side developer allow-list synchronization action.
+    isDeveloper: v.optional(v.boolean()),
     polarCustomerId: v.optional(v.string()),
     polarSubscriptionId: v.optional(v.string()),
     cancelAtPeriodEnd: v.optional(v.boolean()),
