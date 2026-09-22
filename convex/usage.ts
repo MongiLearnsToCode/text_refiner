@@ -12,7 +12,7 @@ async function isUserPro(ctx: any, userId: string): Promise<boolean> {
     .query("subscriptions")
     .withIndex("by_userId", (q: any) => q.eq("userId", userId))
     .unique();
-  const plan = sub?.isDeveloper ? sub.developerOverride ?? sub.plan : sub?.plan;
+  const plan = sub?.isDeveloper ? sub.developerOverride ?? "pro" : sub?.plan;
   return plan === "pro";
 }
 

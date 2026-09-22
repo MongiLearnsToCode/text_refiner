@@ -22,8 +22,10 @@ export const getUserPlan = query({
       .unique();
 
     const isDeveloper = sub?.isDeveloper ?? false;
-    const plan = isDeveloper && sub?.developerOverride
-      ? sub.developerOverride
+    // Developer accounts start on Pro and can explicitly switch to either
+    // plan using `developerOverride`. Their provider subscription is ignored.
+    const plan = isDeveloper
+      ? sub?.developerOverride ?? "pro"
       : sub?.plan ?? "free";
 
     return {
